@@ -1,5 +1,7 @@
 # 해시 테이블 충돌 해결 비교
 
+[https://github.com/minjae-18/algorithms-hw2-Public](https://github.com/minjae-18/algorithms-hw2-Public)
+
 **체이닝과 선형 탐지 · 실험 보고서 · 이슈 #8**
 
 2026년 11월 27일
