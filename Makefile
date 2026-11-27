@@ -3,7 +3,7 @@
 #
 #   make test        유닛 테스트 (tests/test_*.py)
 #   make serve       단축 URL 웹 서버 (포트 8000)
-#   make experiment  적재율에 따른 탐지 횟수 실험
+#   make experiment  체이닝과 선형 탐지의 탐색 비용 비교 실험
 #   make compare     체이닝과 Python dict 성능 비교
 #   make clean       캐시 정리
 #

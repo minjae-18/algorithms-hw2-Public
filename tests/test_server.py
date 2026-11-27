@@ -21,6 +21,7 @@ class ShortenerServerTests(unittest.TestCase):
         shortener_module._url_to_id = HashTable()
         shortener_module._id_to_url = HashTable()
         shortener_module._next_id = 0
+        shortener_module._table_strategy = "chaining"
 
         self.server = ThreadingHTTPServer(
             ("127.0.0.1", 0), ShortenerRequestHandler
@@ -36,8 +37,10 @@ class ShortenerServerTests(unittest.TestCase):
         self.server.server_close()
         self.server_thread.join()
 
-    def request(self, method, path, body=None, headers=None):
-        connection = http.client.HTTPConnection("127.0.0.1", self.port)
+    def request(self, method, path, body=None, headers=None, port=None):
+        connection = http.client.HTTPConnection(
+            "127.0.0.1", self.port if port is None else port
+        )
         connection.request(method, path, body=body, headers=headers or {})
         response = connection.getresponse()
         result = response.status, response.getheaders(), response.read()
@@ -88,6 +91,17 @@ class ShortenerServerTests(unittest.TestCase):
         self.assertIn("mod 8 = 1", page)
         self.assertGreaterEqual(page.count("<li>"), 2)
 
+        shortener_module.configure_hash_table("linear-probing")
+        shortener_module._url_to_id.insert("g", 3)
+        shortener_module._url_to_id.insert("o", 4)
+        status, _, body = self.request("GET", "/table")
+        self.assertEqual(status, 200)
+        page = body.decode("utf-8")
+        self.assertIn("Linear probing", page)
+        self.assertIn("home slot = 7; inspected slots = 7, 0", page)
+        self.assertIn("U+006F [111]", page)
+        shortener_module.configure_hash_table("chaining")
+
     def test_custom_port_and_restart_clears_memory(self):
         project_root = Path(__file__).resolve().parents[1]
         with socket.socket() as port_socket:
@@ -101,6 +115,8 @@ class ShortenerServerTests(unittest.TestCase):
                     str(project_root / "src" / "server.py"),
                     "--port",
                     str(port),
+                    "--hash-table",
+                    "linear-probing",
                 ],
                 cwd=project_root,
                 stdout=subprocess.DEVNULL,
@@ -142,6 +158,9 @@ class ShortenerServerTests(unittest.TestCase):
             self.assertEqual(response.status, 201)
             self.assertEqual(json.loads(response.read())["code"], "0")
             connection.close()
+            status, _, page = self.request("GET", "/table", port=port)
+            self.assertEqual(status, 200)
+            self.assertIn("Linear probing", page.decode("utf-8"))
         finally:
             stop_server(process)
 

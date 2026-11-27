@@ -34,8 +34,9 @@
 | 하고 싶은 것 | 명령 |
 | --- | --- |
 | 테스트 | `make test` |
-| 웹 서버 (포트 8000) | `make serve` |
-| 충돌 실험 | `make experiment` |
+| 웹 서버 (포트 8000, 체이닝) | `make serve` |
+| 웹 서버 (포트 8000, 선형 탐지) | `python3 src/server.py --hash-table linear-probing` |
+| 체이닝·선형 탐지 비용 실험 | `make experiment` |
 | 체이닝 vs Python `dict` 비교 | `make compare` |
 | 놓친 단계 따라잡기 | `sh tools/catchup.sh <단계 번호>` |
 
@@ -44,9 +45,10 @@
 ## 웹 화면과 해시 테이블 확인
 
 `make serve`를 실행하면 URL 입력 화면이 열립니다. URL을 제출하면 짧은 링크가
-표시되고, `/table`에서는 현재 URL-to-ID 체이닝 테이블의 각 버킷, 연결 리스트,
-Horner 해시 계산 단계를 확인할 수 있습니다. 서버는 메모리 기반이므로 종료하면
-저장한 링크가 사라집니다.
+표시되고, `/table`에서는 선택한 URL-to-ID 테이블과 같은 항목으로 다시 구성한 반대 방식
+테이블을 함께 확인할 수 있습니다. 각 버킷/슬롯, Horner 해시 계산 단계, 선형 탐지의
+초기 위치와 실제 탐사 슬롯을 표시합니다. `--hash-table`은 `chaining`(기본값) 또는
+`linear-probing`을 선택합니다. 서버는 메모리 기반이므로 종료하면 저장한 링크가 사라집니다.
 
 Codespaces에서 휴대폰으로 확인하려면 실행 중인 서버의 **Ports** 탭에서 8000번
 포트의 Visibility를 **Public**으로 바꾸고, 표시된 HTTPS 주소를 엽니다. 확인이
@@ -55,7 +57,11 @@ Codespaces에서 휴대폰으로 확인하려면 실행 중인 서버의 **Ports
 
 ## 실험
 
-`make experiment`는 체이닝 해시 테이블의 적재율과 평균 탐색 횟수를 측정합니다.
+`make experiment`는 같은 키 집합에 대해 적재율 0.1부터 0.9까지 체이닝과
+선형 탐지의 평균 탐색 횟수 및 이론값을 비교합니다. 결과는
+[`experiments/probe_experiment.md`](experiments/probe_experiment.md),
+[`experiments/probe_experiment.svg`](experiments/probe_experiment.svg),
+[`experiments/probe_experiment.png`](experiments/probe_experiment.png)에 기록됩니다.
 `make compare`는 직접 구현한 체이닝 테이블과 Python 내장 `dict`의 삽입, 성공
 검색, 실패 검색 시간을 같은 키 집합으로 비교하고 결과를
 [`experiments/comparison_experiment.md`](experiments/comparison_experiment.md)에

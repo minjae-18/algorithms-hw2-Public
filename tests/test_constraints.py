@@ -7,7 +7,12 @@ class ImplementationConstraintTests(unittest.TestCase):
     def test_core_sources_avoid_builtin_dict_set_and_hash(self):
         source_root = Path(__file__).resolve().parents[1] / "src"
         forbidden_names = {"dict", "set", "hash"}
-        source_files = ("base62.py", "hash_table.py", "shortener.py")
+        source_files = (
+            "base62.py",
+            "hash_table.py",
+            "linear_probing_hash_table.py",
+            "shortener.py",
+        )
 
         for filename in source_files:
             with self.subTest(filename=filename):

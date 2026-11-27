@@ -5,11 +5,38 @@ from urllib.parse import urlsplit
 
 from src.base62 import decode, encode
 from src.hash_table import HashTable
+from src.linear_probing_hash_table import LinearProbingHashTable
 
 
 _url_to_id = HashTable()
 _id_to_url = HashTable()
 _next_id = 0
+_table_strategy = "chaining"
+
+
+def configure_hash_table(strategy: str) -> None:
+    """Select a hash-table implementation, preserving existing mappings."""
+    global _url_to_id, _id_to_url, _table_strategy
+
+    if strategy == "chaining":
+        table_type = HashTable
+    elif strategy == "linear-probing":
+        table_type = LinearProbingHashTable
+    else:
+        raise ValueError("strategy must be 'chaining' or 'linear-probing'")
+
+    if strategy == _table_strategy:
+        return
+
+    url_table = table_type()
+    id_table = table_type()
+    for key, value in _url_to_id._iter_items():
+        url_table.insert(key, value)
+    for key, value in _id_to_url._iter_items():
+        id_table.insert(key, value)
+    _url_to_id = url_table
+    _id_to_url = id_table
+    _table_strategy = strategy
 
 
 def _validate_url(url: str) -> None:

@@ -13,7 +13,13 @@ class _Node:
 class HashTable:
     """Store key/value pairs in a resizable array of linked lists."""
 
-    def __init__(self, max_load_factor: float = 0.75):
+    def __init__(
+        self, max_load_factor: float = 0.75, *, initial_capacity: int = 8
+    ):
+        if isinstance(initial_capacity, bool) or not isinstance(initial_capacity, int):
+            raise TypeError("initial_capacity must be a positive integer")
+        if initial_capacity <= 0:
+            raise ValueError("initial_capacity must be a positive integer")
         if isinstance(max_load_factor, bool) or not isinstance(
             max_load_factor, (int, float)
         ):
@@ -27,7 +33,7 @@ class HashTable:
         if max_load_factor <= 0 or not math.isfinite(max_load_factor):
             raise ValueError("max_load_factor must be a finite positive number")
 
-        self._capacity = 8
+        self._capacity = initial_capacity
         self._size = 0
         self._max_load_factor = max_load_factor
         self._buckets: list[_Node | None] = [None] * self._capacity
@@ -75,6 +81,13 @@ class HashTable:
                 return node.value
             node = node.next
         return None
+
+    def _iter_items(self):
+        for head in self._buckets:
+            node = head
+            while node is not None:
+                yield node.key, node.value
+                node = node.next
 
     def _resize(self) -> None:
         self._capacity *= 2

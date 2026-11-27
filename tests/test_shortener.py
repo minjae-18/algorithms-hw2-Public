@@ -3,14 +3,19 @@ import unittest
 import src.shortener as shortener_module
 from src.base62 import decode
 from src.hash_table import HashTable
+from src.linear_probing_hash_table import LinearProbingHashTable
 from src.shortener import expand, shorten
 
 
-class ShortenerTests(unittest.TestCase):
+class ShortenerTestMixin:
+    strategy = "chaining"
+
     def setUp(self):
         shortener_module._url_to_id = HashTable()
         shortener_module._id_to_url = HashTable()
         shortener_module._next_id = 0
+        shortener_module._table_strategy = "chaining"
+        shortener_module.configure_hash_table(self.strategy)
 
     def test_shortens_and_expands_urls_with_sequential_codes(self):
         first_url = "https://example.com/path?query=value#section"
@@ -98,6 +103,38 @@ class ShortenerTests(unittest.TestCase):
     def test_valid_but_unregistered_code_raises_key_error(self):
         with self.assertRaises(KeyError):
             expand("0")
+
+
+class ChainingShortenerTests(ShortenerTestMixin, unittest.TestCase):
+    pass
+
+
+class LinearProbingShortenerTests(ShortenerTestMixin, unittest.TestCase):
+    strategy = "linear-probing"
+
+
+class ShortenerStrategyTests(unittest.TestCase):
+    def setUp(self):
+        shortener_module._url_to_id = HashTable()
+        shortener_module._id_to_url = HashTable()
+        shortener_module._next_id = 0
+        shortener_module._table_strategy = "chaining"
+
+    def test_switching_strategies_preserves_mappings_and_rejects_unknown(self):
+        self.assertEqual(shorten("https://example.com"), "0")
+        self.assertEqual(shorten("https://example.org"), "1")
+
+        shortener_module.configure_hash_table("linear-probing")
+        self.assertIsInstance(shortener_module._url_to_id, LinearProbingHashTable)
+        self.assertEqual(shorten("https://example.com"), "0")
+        self.assertEqual(expand("1"), "https://example.org")
+        self.assertEqual(shorten("https://example.net"), "2")
+
+        shortener_module.configure_hash_table("chaining")
+        self.assertIsInstance(shortener_module._url_to_id, HashTable)
+        self.assertEqual(expand("2"), "https://example.net")
+        with self.assertRaises(ValueError):
+            shortener_module.configure_hash_table("unknown")
 
 
 if __name__ == "__main__":

@@ -13,6 +13,7 @@ if __package__ in (None, ""):
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.hash_table import HashTable
+from src.linear_probing_hash_table import LinearProbingHashTable
 import src.shortener as shortener_module
 from src.shortener import expand, shorten
 
@@ -60,15 +61,29 @@ class ShortenerRequestHandler(BaseHTTPRequestHandler):
             f"<body><h1>{html.escape(title)}</h1>{content}</body></html>"
         )
 
-    def _render_hash_table(self, table: HashTable) -> str:
+    def _render_hash_table(
+        self, table: HashTable | LinearProbingHashTable
+    ) -> str:
         rows = []
-        for bucket_index, head in enumerate(table._buckets):
-            entries = []
-            node = head
-            while node is not None:
+        is_linear_probing = isinstance(table, LinearProbingHashTable)
+        if is_linear_probing:
+            for slot_index, entry in enumerate(table._slots):
+                if entry is None:
+                    rows.append(
+                        f"<tr><th>{slot_index}</th><td><em>empty</em></td></tr>"
+                    )
+                    continue
+
+                initial_index = table._bucket_index(entry.key)
+                probe_indices = [
+                    (initial_index + offset) % table.capacity
+                    for offset in range(
+                        (slot_index - initial_index) % table.capacity + 1
+                    )
+                ]
                 steps = ["h = 0"]
                 value = 0
-                for character in node.key:
+                for character in entry.key:
                     code_point = ord(character)
                     previous_value = value
                     value = (previous_value * 31 + code_point) % table.capacity
@@ -77,22 +92,69 @@ class ShortenerRequestHandler(BaseHTTPRequestHandler):
                         f"[{code_point}]) mod {table.capacity} = {value}"
                     )
                 calculation = "<br>".join(html.escape(step) for step in steps)
-                entries.append(
-                    "<li><strong>"
-                    f"{html.escape(node.key)}</strong> &rarr; "
-                    f"{html.escape(str(node.value))}<br><code>{calculation}</code></li>"
+                detail = (
+                    f"home slot = {initial_index}; inspected slots = "
+                    f"{', '.join(str(index) for index in probe_indices)}"
                 )
-                node = node.next
-            chain = "<ol>" + "".join(entries) + "</ol>" if entries else "<em>empty</em>"
-            rows.append(f"<tr><th>{bucket_index}</th><td>{chain}</td></tr>")
+                rows.append(
+                    f"<tr><th>{slot_index}</th><td><strong>"
+                    f"{html.escape(entry.key)}</strong> &rarr; "
+                    f"{html.escape(str(entry.value))}<br>"
+                    f"{html.escape(detail)}<br><code>{calculation}</code></td></tr>"
+                )
+            description = (
+                "Linear probing: start at the Horner-hash slot and inspect "
+                "(index + 1) mod capacity until an empty slot or matching key."
+            )
+            layout = "Slot"
+        else:
+            for bucket_index, head in enumerate(table._buckets):
+                entries = []
+                node = head
+                while node is not None:
+                    steps = ["h = 0"]
+                    value = 0
+                    for character in node.key:
+                        code_point = ord(character)
+                        previous_value = value
+                        value = (previous_value * 31 + code_point) % table.capacity
+                        steps.append(
+                            f"h = ({previous_value} * 31 + U+{code_point:04X} "
+                            f"[{code_point}]) mod {table.capacity} = {value}"
+                        )
+                    calculation = "<br>".join(html.escape(step) for step in steps)
+                    entries.append(
+                        "<li><strong>"
+                        f"{html.escape(node.key)}</strong> &rarr; "
+                        f"{html.escape(str(node.value))}<br><code>{calculation}</code></li>"
+                    )
+                    node = node.next
+                chain = "<ol>" + "".join(entries) + "</ol>" if entries else "<em>empty</em>"
+                rows.append(f"<tr><th>{bucket_index}</th><td>{chain}</td></tr>")
+            description = (
+                "Horner hash: h = (h * 31 + character code point) mod capacity."
+            )
+            layout = "Bucket"
         return (
             f"<p>capacity = {table.capacity}, entries = {table.size}; "
-            "Horner hash: h = (h * 31 + character code point) mod capacity.</p>"
-            "<table><thead><tr><th class=\"bucket\">Bucket</th>"
-            "<th>Linked-list chain and Horner steps</th></tr></thead><tbody>"
+            f"{html.escape(description)}</p>"
+            f"<table><thead><tr><th class=\"bucket\">{layout}</th>"
+            f"<th>{'Probe sequence' if is_linear_probing else 'Linked-list chain'} and Horner steps</th></tr></thead><tbody>"
             + "".join(rows)
             + "</tbody></table>"
         )
+
+    def _alternate_hash_table(
+        self, table: HashTable | LinearProbingHashTable
+    ) -> HashTable | LinearProbingHashTable:
+        alternate_type = (
+            HashTable if isinstance(table, LinearProbingHashTable)
+            else LinearProbingHashTable
+        )
+        alternate_table = alternate_type()
+        for key, value in table._iter_items():
+            alternate_table.insert(key, value)
+        return alternate_table
 
     def _send_error_json(self, status: int, message: str) -> None:
         self._send_json(status, {"error": message})
@@ -157,9 +219,27 @@ class ShortenerRequestHandler(BaseHTTPRequestHandler):
             self._send_html(200, self._page("URL Shortener", content))
             return
         if path == "/table":
-            content = self._render_hash_table(shortener_module._url_to_id)
+            table = shortener_module._url_to_id
+            active_strategy = (
+                "linear probing"
+                if isinstance(table, LinearProbingHashTable)
+                else "chaining"
+            )
+            alternate_table = self._alternate_hash_table(table)
+            alternate_strategy = (
+                "chaining"
+                if isinstance(alternate_table, HashTable)
+                else "linear probing"
+            )
+            content = (
+                f"<h2>Selected strategy: {active_strategy}</h2>"
+                + self._render_hash_table(table)
+                + f"<h2>Alternative view: {alternate_strategy}</h2>"
+                "<p>This view rebuilds the same entries using the other strategy.</p>"
+                + self._render_hash_table(alternate_table)
+            )
             content += "<p><a href=\"/\">Back to URL shortener</a></p>"
-            self._send_html(200, self._page("Hash table buckets", content))
+            self._send_html(200, self._page("Hash table comparison", content))
             return
         if not path.startswith("/") or "/" in path[1:]:
             self._send_error_json(400, "Invalid short code")
@@ -201,11 +281,18 @@ class ShortenerRequestHandler(BaseHTTPRequestHandler):
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run the URL shortener HTTP server.")
     parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument(
+        "--hash-table",
+        choices=("chaining", "linear-probing"),
+        default="chaining",
+        help="hash-table collision strategy",
+    )
     args = parser.parse_args()
 
     if not 1 <= args.port <= 65535:
         parser.error("--port must be between 1 and 65535")
 
+    shortener_module.configure_hash_table(args.hash_table)
     server = ThreadingHTTPServer(("", args.port), ShortenerRequestHandler)
     try:
         print(f"Serving on port {args.port}")
