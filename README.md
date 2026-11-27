@@ -59,6 +59,7 @@ Codespaces에서 휴대폰으로 확인하려면 실행 중인 서버의 **Ports
 
 `make experiment`는 같은 키 집합에 대해 적재율 0.1부터 0.9까지 체이닝과
 선형 탐지의 평균 탐색 횟수 및 이론값을 비교합니다. 결과는
+[`experiments/results.csv`](experiments/results.csv),
 [`experiments/probe_experiment.md`](experiments/probe_experiment.md),
 [`experiments/probe_experiment.svg`](experiments/probe_experiment.svg),
 [`experiments/probe_experiment.png`](experiments/probe_experiment.png)에 기록됩니다.

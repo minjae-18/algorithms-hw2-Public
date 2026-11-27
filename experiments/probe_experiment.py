@@ -1,5 +1,6 @@
 """Compare chaining and linear-probing search costs across load factors."""
 
+import csv
 import math
 import random
 import struct
@@ -125,6 +126,24 @@ def _write_markdown(rows: list[tuple[float, ...]], destination: Path) -> None:
         )
     lines.append("")
     destination.write_text("\n".join(lines), encoding="utf-8")
+
+
+def _write_csv(rows: list[tuple[float, ...]], destination: Path) -> None:
+    headers = (
+        "load_factor",
+        "chaining_success_measured",
+        "chaining_success_theory",
+        "chaining_unsuccessful_measured",
+        "chaining_unsuccessful_theory",
+        "linear_probing_success_measured",
+        "linear_probing_success_theory",
+        "linear_probing_unsuccessful_measured",
+        "linear_probing_unsuccessful_theory",
+    )
+    with destination.open("w", encoding="utf-8", newline="") as output:
+        writer = csv.writer(output)
+        writer.writerow(headers)
+        writer.writerows(rows)
 
 
 def _write_svg(rows: list[tuple[float, ...]], destination: Path) -> None:
@@ -394,12 +413,15 @@ def _write_png(rows: list[tuple[float, ...]], destination: Path) -> None:
 def main() -> None:
     rows = [_measure(load_factor) for load_factor in LOAD_FACTORS]
     output_dir = Path(__file__).resolve().parent
+    csv_path = output_dir / "results.csv"
     markdown_path = output_dir / "probe_experiment.md"
     svg_path = output_dir / "probe_experiment.svg"
     png_path = output_dir / "probe_experiment.png"
+    _write_csv(rows, csv_path)
     _write_markdown(rows, markdown_path)
     _write_svg(rows, svg_path)
     _write_png(rows, png_path)
+    print(csv_path)
     print(markdown_path)
     print(svg_path)
     print(png_path)
