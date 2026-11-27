@@ -62,6 +62,8 @@ Codespaces에서 휴대폰으로 확인하려면 실행 중인 서버의 **Ports
 [`experiments/probe_experiment.md`](experiments/probe_experiment.md),
 [`experiments/probe_experiment.svg`](experiments/probe_experiment.svg),
 [`experiments/probe_experiment.png`](experiments/probe_experiment.png)에 기록됩니다.
+비교 결과 보고서는 [PDF](report.pdf)와
+[원본 Markdown](report.md)에서 확인할 수 있습니다.
 `make compare`는 직접 구현한 체이닝 테이블과 Python 내장 `dict`의 삽입, 성공
 검색, 실패 검색 시간을 같은 키 집합으로 비교하고 결과를
 [`experiments/comparison_experiment.md`](experiments/comparison_experiment.md)에
