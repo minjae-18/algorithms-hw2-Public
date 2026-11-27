@@ -1,5 +1,7 @@
 """A string-keyed hash table using separate chaining."""
 
+import math
+
 
 class _Node:
     def __init__(self, key: str, value: object, next_node: "_Node | None" = None):
@@ -11,9 +13,23 @@ class _Node:
 class HashTable:
     """Store key/value pairs in a resizable array of linked lists."""
 
-    def __init__(self):
+    def __init__(self, max_load_factor: float = 0.75):
+        if isinstance(max_load_factor, bool) or not isinstance(
+            max_load_factor, (int, float)
+        ):
+            raise TypeError("max_load_factor must be a finite positive number")
+        try:
+            max_load_factor = float(max_load_factor)
+        except OverflowError as error:
+            raise ValueError(
+                "max_load_factor must be a finite positive number"
+            ) from error
+        if max_load_factor <= 0 or not math.isfinite(max_load_factor):
+            raise ValueError("max_load_factor must be a finite positive number")
+
         self._capacity = 8
         self._size = 0
+        self._max_load_factor = max_load_factor
         self._buckets: list[_Node | None] = [None] * self._capacity
 
     @property
@@ -44,7 +60,7 @@ class HashTable:
 
         self._buckets[index] = _Node(key, value, self._buckets[index])
         self._size += 1
-        if self._size / self._capacity > 0.75:
+        if self._size / self._capacity > self._max_load_factor:
             self._resize()
         return True
 

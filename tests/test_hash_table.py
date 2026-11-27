@@ -43,6 +43,28 @@ class HashTableTests(unittest.TestCase):
         for index in range(7):
             self.assertEqual(table.get(f"key-{index}"), index)
 
+    def test_table_uses_configured_maximum_load_factor(self):
+        table = HashTable(max_load_factor=0.5)
+
+        for index in range(5):
+            self.assertTrue(table.insert(f"key-{index}", index))
+
+        self.assertEqual(table.capacity, 16)
+        self.assertEqual(table.size, 5)
+        for index in range(5):
+            self.assertEqual(table.get(f"key-{index}"), index)
+
+    def test_maximum_load_factor_must_be_finite_and_positive(self):
+        for value in (0, -0.5, float("inf"), float("nan")):
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):
+                    HashTable(max_load_factor=value)
+
+        for value in ("0.75", True):
+            with self.subTest(value=value):
+                with self.assertRaises(TypeError):
+                    HashTable(max_load_factor=value)
+
     def test_non_string_keys_are_rejected(self):
         table = HashTable()
 
