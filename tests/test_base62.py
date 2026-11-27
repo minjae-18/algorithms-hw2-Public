@@ -40,6 +40,8 @@ class Base62Tests(unittest.TestCase):
         with self.assertRaises(ValueError):
             decode("a!")
         with self.assertRaises(TypeError):
+            decode(True)
+        with self.assertRaises(TypeError):
             decode(1)
 
 

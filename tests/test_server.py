@@ -1,8 +1,14 @@
 import http.client
 import json
+import signal
+import socket
+import subprocess
+import sys
 import threading
+import time
 import unittest
 from http.server import ThreadingHTTPServer
+from pathlib import Path
 
 import src.shortener as shortener_module
 from src.hash_table import HashTable
@@ -36,6 +42,74 @@ class ShortenerServerTests(unittest.TestCase):
         result = response.status, response.getheaders(), response.read()
         connection.close()
         return result
+
+    def test_custom_port_and_restart_clears_memory(self):
+        project_root = Path(__file__).resolve().parents[1]
+        with socket.socket() as port_socket:
+            port_socket.bind(("127.0.0.1", 0))
+            port = port_socket.getsockname()[1]
+
+        def start_server():
+            return subprocess.Popen(
+                [
+                    sys.executable,
+                    str(project_root / "src" / "server.py"),
+                    "--port",
+                    str(port),
+                ],
+                cwd=project_root,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+
+        def stop_server(process):
+            if process.poll() is None:
+                process.send_signal(signal.SIGINT)
+                process.wait(timeout=5)
+
+        def wait_until_ready():
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                try:
+                    connection = http.client.HTTPConnection(
+                        "127.0.0.1", port, timeout=1
+                    )
+                    connection.request("GET", "/")
+                    response = connection.getresponse()
+                    status = response.status
+                    response.read()
+                    connection.close()
+                    return status
+                except OSError:
+                    time.sleep(0.02)
+            self.fail("server did not start on the requested port")
+
+        process = start_server()
+        try:
+            self.assertEqual(wait_until_ready(), 400)
+            connection = http.client.HTTPConnection("127.0.0.1", port, timeout=1)
+            connection.request(
+                "POST",
+                "/shorten",
+                body=json.dumps({"url": "https://example.com"}),
+            )
+            response = connection.getresponse()
+            self.assertEqual(response.status, 201)
+            self.assertEqual(json.loads(response.read())["code"], "0")
+            connection.close()
+        finally:
+            stop_server(process)
+
+        process = start_server()
+        try:
+            self.assertEqual(wait_until_ready(), 400)
+            connection = http.client.HTTPConnection("127.0.0.1", port, timeout=1)
+            connection.request("GET", "/0")
+            response = connection.getresponse()
+            self.assertEqual(response.status, 404)
+            connection.close()
+        finally:
+            stop_server(process)
 
     def test_post_shorten_returns_json_and_existing_code(self):
         body = json.dumps({"url": "https://example.com/path"})
