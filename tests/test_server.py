@@ -9,6 +9,7 @@ import time
 import unittest
 from http.server import ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import urlencode
 
 import src.shortener as shortener_module
 from src.hash_table import HashTable
@@ -35,13 +36,57 @@ class ShortenerServerTests(unittest.TestCase):
         self.server.server_close()
         self.server_thread.join()
 
-    def request(self, method, path, body=None):
+    def request(self, method, path, body=None, headers=None):
         connection = http.client.HTTPConnection("127.0.0.1", self.port)
-        connection.request(method, path, body=body)
+        connection.request(method, path, body=body, headers=headers or {})
         response = connection.getresponse()
         result = response.status, response.getheaders(), response.read()
         connection.close()
         return result
+
+    def test_homepage_contains_responsive_url_form_and_table_link(self):
+        status, headers, body = self.request("GET", "/")
+
+        self.assertEqual(status, 200)
+        self.assertIn(("Content-Type", "text/html; charset=utf-8"), headers)
+        page = body.decode("utf-8")
+        self.assertIn('action="/shorten" method="post"', page)
+        self.assertIn('name="url"', page)
+        self.assertIn('name="viewport"', page)
+        self.assertIn('href="/table"', page)
+
+    def test_form_submission_returns_shareable_link(self):
+        status, headers, body = self.request(
+            "POST",
+            "/shorten",
+            urlencode({"url": "https://example.com/path"}),
+            {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Host": "short.example",
+                "X-Forwarded-Proto": "https",
+            },
+        )
+
+        self.assertEqual(status, 201)
+        self.assertIn(("Content-Type", "text/html; charset=utf-8"), headers)
+        page = body.decode("utf-8")
+        self.assertIn("https://short.example/0", page)
+        self.assertIn('href="/table"', page)
+
+    def test_table_shows_chains_and_horner_calculation_steps(self):
+        shortener_module._url_to_id.insert("a", 1)
+        shortener_module._url_to_id.insert("i", 2)
+
+        status, _, body = self.request("GET", "/table")
+
+        self.assertEqual(status, 200)
+        page = body.decode("utf-8")
+        self.assertIn("Linked-list chain", page)
+        self.assertIn("Horner hash", page)
+        self.assertIn("U+0069 [105]", page)
+        self.assertIn("U+0061 [97]", page)
+        self.assertIn("mod 8 = 1", page)
+        self.assertGreaterEqual(page.count("<li>"), 2)
 
     def test_custom_port_and_restart_clears_memory(self):
         project_root = Path(__file__).resolve().parents[1]
@@ -86,7 +131,7 @@ class ShortenerServerTests(unittest.TestCase):
 
         process = start_server()
         try:
-            self.assertEqual(wait_until_ready(), 400)
+            self.assertEqual(wait_until_ready(), 200)
             connection = http.client.HTTPConnection("127.0.0.1", port, timeout=1)
             connection.request(
                 "POST",
@@ -102,7 +147,7 @@ class ShortenerServerTests(unittest.TestCase):
 
         process = start_server()
         try:
-            self.assertEqual(wait_until_ready(), 400)
+            self.assertEqual(wait_until_ready(), 200)
             connection = http.client.HTTPConnection("127.0.0.1", port, timeout=1)
             connection.request("GET", "/0")
             response = connection.getresponse()
@@ -160,7 +205,6 @@ class ShortenerServerTests(unittest.TestCase):
 
     def test_get_rejects_root_and_invalid_or_unknown_codes(self):
         for path, expected_status in [
-            ("/", 400),
             ("///0", 400),
             ("/bad!", 400),
             ("/unknown", 404),
